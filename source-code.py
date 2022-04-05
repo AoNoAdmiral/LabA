@@ -1,60 +1,38 @@
-print("Xin chào ThingsBoard")
-import paho.mqtt.client as mqttclient
+import os
 import time
+import sys
 import json
-import geocoder
+import random
+import paho.mqtt.client as mqtt
 
-BROKER_ADDRESS = "demo.thingsboard.io"
-PORT = 1883
-THINGS_BOARD_ACCESS_TOKEN = "Ihhhof4hj9MrNOcZ7uV1"
+# Thingsboard platform credentials
+THINGSBOARD_HOST = "demo.thingsboard.io"
+ACCESS_TOKEN = 'LyoSMl8n9Yoki1fBpJoj'
+request = {"method": "gettelemetry", "params": {}}
 
+# MQTT on_connect callback function
+def on_connect(client, userdata, flags, rc):
+    print("rc code:", rc)
+    client.subscribe('v1/devices/me/rpc/response/+')
+    client.publish('v1/devices/me/rpc/request/1',json.dumps(request), 1)
 
-def subscribed(client, userdata, mid, granted_qos):
-    print("Subscribed...")
+# MQTT on_message caallback function
+def on_message(client, userdata, msg):
+    print('Topic: ' + msg.topic + '\nMessage: ' + str(msg.payload))
 
+# start the client instance
+client = mqtt.Client()
 
-def recv_message(client, userdata, message):
-    print("Received: ", message.payload.decode("utf-8"))
-    temp_data = {'value': True}
-    try:
-        jsonobj = json.loads(message.payload)
-        if jsonobj['method'] == "setValue":
-            temp_data['value'] = jsonobj['params']
-            client.publish('v1/devices/me/attributes', json.dumps(temp_data), 1)
-    except:
-        pass
+# registering the callbacks
+client.on_connect = on_connect
+client.on_message = on_message
 
+client.username_pw_set(ACCESS_TOKEN)
+client.connect(THINGSBOARD_HOST, 1883,60)
 
-def connected(client, usedata, flags, rc):
-    if rc == 0:
-        print("Thingsboard connected successfully!!")
-        client.subscribe("v1/devices/me/rpc/request/+")
-    else:
-        print("Connection is failed")
+try:
+    client.loop_forever()
 
-
-client = mqttclient.Client("Gateway_Thingsboard")
-client.username_pw_set(THINGS_BOARD_ACCESS_TOKEN)
-
-client.on_connect = connected
-client.connect(BROKER_ADDRESS, 1883)
-client.loop_start()
-
-client.on_subscribe = subscribed
-client.on_message = recv_message
-
-temp = 30
-humi = 50
-light_intesity = 100
-counter = 0
-
-while True:
-    g = geocoder.ip('me')
-    collect_data = {'temperature': temp, 'humidity': humi, 'light':light_intesity, 'longitude': g.latlng[1], 'latitude': g.latlng[0]}
-    temp += 1
-    humi += 1
-    light_intesity += 1
-    client.publish('v1/devices/me/telemetry', json.dumps(collect_data), 1)
-    time.sleep(10)
-    
+except KeyboardInterrupt:
+    client.disconnect()
 # https://demo.thingsboard.io/dashboard/50770330-7826-11ec-91d1-9b16bfb7b504?publicId=e1aef1d0-7823-11ec-91d1-9b16bfb7b504
